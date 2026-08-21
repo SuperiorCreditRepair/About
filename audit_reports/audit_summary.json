@@ -1,0 +1,178 @@
+{
+  "total_pages": 5843,
+  "unique_slugs": 5843,
+  "kinds": {
+    "DEEP_REDO": 2766,
+    "OTHER": 1774,
+    "REPAIRED_OTHER": 380,
+    "REPAIRED": 487,
+    "CLEARED_PRODUCTION": 311,
+    "MASTER_ORIGINAL": 125
+  },
+  "store_count": 55,
+  "wordcount_min": 1665,
+  "wordcount_p50": 4014,
+  "wordcount_p90": 7119,
+  "wordcount_max": 18472,
+  "duplicate_title_groups": 248,
+  "duplicate_title_pages": 496,
+  "exact_text_duplicate_groups": 0,
+  "exact_text_duplicate_pages": 0,
+  "exact_html_duplicate_groups": 0,
+  "h2_skeleton_clusters": 4,
+  "h2_cluster_pages": 57,
+  "near_duplicate_pairs": 10,
+  "flag_counts": {
+    "TRUNCATED_META": 416,
+    "AREA_AREA_TYPO": 1324,
+    "SLOT_SUBJECT_VERB": 473,
+    "USE_USE_TYPO": 13,
+    "HARD_GUARANTEE": 160,
+    "CLEARED_DO_NOT_OVERWRITE": 311,
+    "MISSING_META": 311,
+    "WATERMARK_TOKENS": 29,
+    "PROTECTED_SEQUENCE_1_5": 5,
+    "SHORT_TITLE": 2
+  },
+  "protected_seq_1_5": [
+    "bossier-la-homebuyer-credit-repair",
+    "comal-tx-homebuyer-credit-repair",
+    "daviess-mo-homebuyer-credit-repair",
+    "emmet-mi-homebuyer-credit-repair",
+    "west-yellowstone-mt-credit-score-help"
+  ],
+  "cleared_pages": 311,
+  "watermark_cleared_pages": 29,
+  "phones_top": [
+    [
+      "605-229-4749",
+      2
+    ],
+    [
+      "7008389285",
+      2
+    ],
+    [
+      "800-569-4287",
+      2
+    ],
+    [
+      "985-873-6567",
+      2
+    ],
+    [
+      "931-837-4570",
+      2
+    ],
+    [
+      "406-455-8431",
+      1
+    ],
+    [
+      "863) 675-5245",
+      1
+    ],
+    [
+      "863) 983-1463",
+      1
+    ],
+    [
+      "863) 675-5222",
+      1
+    ],
+    [
+      "863) 983-5797",
+      1
+    ],
+    [
+      "863-675-3507",
+      1
+    ],
+    [
+      "276) 634-4615",
+      1
+    ]
+  ],
+  "slot_h2_top": [
+    [
+      "collection and negative-account review",
+      123
+    ],
+    [
+      "payment-history timeline",
+      120
+    ],
+    [
+      "underwriting questions",
+      115
+    ],
+    [
+      "positive credit rebuilding",
+      113
+    ],
+    [
+      "related next steps",
+      111
+    ],
+    [
+      "avoidable missteps",
+      107
+    ],
+    [
+      "accuracy and dispute preparation",
+      107
+    ],
+    [
+      "supporting records",
+      101
+    ],
+    [
+      "reported balances and utilization",
+      64
+    ],
+    [
+      "local planning sequence",
+      63
+    ],
+    [
+      "revolving balance management",
+      59
+    ],
+    [
+      "credit-file stability",
+      54
+    ],
+    [
+      "timing before a lender conversation",
+      53
+    ],
+    [
+      "recent application activity",
+      46
+    ],
+    [
+      "preapproval readiness",
+      44
+    ],
+    [
+      "decision points",
+      43
+    ],
+    [
+      "baseline report inventory",
+      42
+    ],
+    [
+      "what the topic really means",
+      34
+    ],
+    [
+      "approval-readiness context",
+      30
+    ],
+    [
+      "state and local context",
+      29
+    ]
+  ]
+}

@@ -1,0 +1,4 @@
+CHATGPT_BATCH_INTAKE/UNIQUENESS_CORPUS/*.csv
+__pycache__/
+*.pyc
+.audit_work/
