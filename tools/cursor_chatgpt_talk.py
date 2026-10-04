@@ -15,6 +15,11 @@ The thread is stored in chatgpt_bridge/thread.json and is not committed.
 Set OPENAI_MODEL to override the default model (chat-latest, the current
 ChatGPT instant model). Set OPENAI_BASE_URL to point at another
 Chat Completions endpoint.
+
+    python tools/cursor_chatgpt_talk.py --transport browser send "Hello from Cursor."
+
+Browser mode uses the ChatGPT website in a Chrome window that is already
+open with remote debugging on 127.0.0.1:9222. It does not need an API key.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -138,6 +144,126 @@ def append_exchange(thread: dict, cursor_text: str, reply: str, model: str) -> N
     )
 
 
+def parse_chatgpt_replies(page_text: str) -> list[str]:
+    replies: list[str] = []
+    chunks = page_text.split("ChatGPT said:")[1:]
+    for chunk in chunks:
+        for marker in ("You said:", "ChatGPT is AI", "Chat with ChatGPT"):
+            index = chunk.find(marker)
+            if index >= 0:
+                chunk = chunk[:index]
+        text = "\n".join(line.strip() for line in chunk.splitlines() if line.strip())
+        if text:
+            replies.append(text)
+    return replies
+
+
+def _page_text_via_cdp(debug_port: int, timeout: float) -> tuple[object, str]:
+    import websocket
+
+    targets = json.load(
+        urllib.request.urlopen(f"http://127.0.0.1:{debug_port}/json/list", timeout=10)
+    )
+    page = next(
+        (
+            target
+            for target in targets
+            if target.get("type") == "page" and "chatgpt.com" in target.get("url", "")
+        ),
+        None,
+    )
+    if page is None:
+        raise ChatGPTError(
+            "No chatgpt.com tab is open in Chrome on the debug port."
+        )
+    socket = websocket.create_connection(
+        page["webSocketDebuggerUrl"],
+        timeout=timeout,
+        suppress_origin=True,
+    )
+    return socket, page["url"]
+
+
+def _cdp(socket: object, method: str, params: dict | None = None, timeout: float = 30) -> dict:
+    call_id = getattr(socket, "_cursor_cdp_id", 0) + 1
+    setattr(socket, "_cursor_cdp_id", call_id)
+    socket.send(json.dumps({"id": call_id, "method": method, "params": params or {}}))
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        data = json.loads(socket.recv())
+        if data.get("id") == call_id:
+            if "error" in data:
+                raise ChatGPTError(f"Chrome debugger error: {data['error']}")
+            return data["result"]
+    raise ChatGPTError(f"Chrome debugger timed out during {method}.")
+
+
+def browser_page_text(socket: object) -> str:
+    result = _cdp(
+        socket,
+        "Runtime.evaluate",
+        {
+            "expression": "document.body ? document.body.innerText : ''",
+            "returnByValue": True,
+        },
+    )
+    return str(result.get("result", {}).get("value") or "")
+
+
+def browser_send_message(socket: object, cursor_text: str) -> None:
+    script = """
+(() => {
+  const el = document.querySelector('textarea');
+  if (!el) return 'no textarea';
+  const proto = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
+  proto.set.call(el, TEXT);
+  el.focus();
+  el.dispatchEvent(new Event('input', {bubbles:true}));
+  const btn = document.querySelector('button[aria-label="Send message"]');
+  if (!btn) return 'no send button';
+  btn.click();
+  return 'sent';
+})()
+""".replace("TEXT", json.dumps(cursor_text))
+    result = _cdp(
+        socket,
+        "Runtime.evaluate",
+        {"expression": script, "returnByValue": True},
+    )
+    status = str(result.get("result", {}).get("value") or "")
+    if status != "sent":
+        raise ChatGPTError(f"Could not send the message in ChatGPT: {status}")
+
+
+def request_browser_reply(cursor_text: str, *, debug_port: int, timeout: float) -> str:
+    socket, _url = _page_text_via_cdp(debug_port, timeout)
+    try:
+        before = len(parse_chatgpt_replies(browser_page_text(socket)))
+        browser_send_message(socket, cursor_text)
+        deadline = time.monotonic() + timeout
+        latest = ""
+        stable = 0
+        while time.monotonic() < deadline:
+            time.sleep(1)
+            replies = parse_chatgpt_replies(browser_page_text(socket))
+            if len(replies) <= before:
+                stable = 0
+                continue
+            current = replies[-1]
+            if current == latest:
+                stable += 1
+                if stable >= 2:
+                    return current
+            else:
+                latest = current
+                stable = 0
+        if latest:
+            return latest
+        raise ChatGPTError("ChatGPT did not reply in the open browser tab.")
+    finally:
+        socket.close()
+
+
 def send_turn(
     thread: dict,
     cursor_text: str,
@@ -201,6 +327,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.environ.get("OPENAI_BASE_URL", DEFAULT_BASE_URL),
     )
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    parser.add_argument(
+        "--transport",
+        choices=("api", "browser"),
+        default=os.environ.get("CHATGPT_TRANSPORT", "api"),
+        help="api uses OPENAI_API_KEY. browser uses an open chatgpt.com tab.",
+    )
+    parser.add_argument(
+        "--debug-port",
+        type=int,
+        default=int(os.environ.get("CHATGPT_DEBUG_PORT", "9222")),
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     send = sub.add_parser("send", help="Send Cursor's next turn and print ChatGPT's reply.")
@@ -225,25 +362,34 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Cleared {args.thread}")
         return 0
 
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        print(
-            "OPENAI_API_KEY is not set. Add a ChatGPT / OpenAI API key, then run send again.",
-            file=sys.stderr,
-        )
-        return 2
-
     try:
-        cursor_text = read_message(args)
+        cursor_text = read_message(args).strip()
+        if not cursor_text:
+            raise ChatGPTError("Cursor's message is empty.")
         thread = load_thread(args.thread, args.model)
-        reply = send_turn(
-            thread,
-            cursor_text,
-            api_key=api_key,
-            model=args.model,
-            base_url=args.base_url,
-            timeout=args.timeout,
-        )
+        if args.transport == "browser":
+            reply = request_browser_reply(
+                cursor_text,
+                debug_port=args.debug_port,
+                timeout=args.timeout,
+            )
+            append_exchange(thread, cursor_text, reply, "chatgpt.com")
+        else:
+            api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+            if not api_key:
+                print(
+                    "OPENAI_API_KEY is not set. Add a ChatGPT / OpenAI API key, then run send again.",
+                    file=sys.stderr,
+                )
+                return 2
+            reply = send_turn(
+                thread,
+                cursor_text,
+                api_key=api_key,
+                model=args.model,
+                base_url=args.base_url,
+                timeout=args.timeout,
+            )
         save_thread(args.thread, thread)
     except (ChatGPTError, OSError) as exc:
         print(str(exc), file=sys.stderr)

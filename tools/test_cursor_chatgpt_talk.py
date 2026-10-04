@@ -52,6 +52,29 @@ class RecordingHandler(BaseHTTPRequestHandler):
 
 
 class TalkTests(unittest.TestCase):
+    def test_parse_chatgpt_replies_keeps_each_turn(self) -> None:
+        page = """
+You said:
+Hello from Cursor.
+ChatGPT said:
+PINE-THREAD
+What should we work on?
+You said:
+Continue with the contact page.
+ChatGPT said:
+PINE-THREAD
+What should change on the contact page?
+ChatGPT is AI and can make mistakes.
+"""
+        replies = talk.parse_chatgpt_replies(page)
+        self.assertEqual(
+            replies,
+            [
+                "PINE-THREAD\nWhat should we work on?",
+                "PINE-THREAD\nWhat should change on the contact page?",
+            ],
+        )
+
     def test_two_turns_keep_shared_context(self) -> None:
         RecordingHandler.requests = []
         server = ThreadingHTTPServer(("127.0.0.1", 0), RecordingHandler)
